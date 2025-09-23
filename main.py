@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException, Query
 import crud, schemas
-from typing import List
+from typing import List, Dict, Any
+from datetime import datetime
 
 app = FastAPI(title="Demo API")
 
 # ========== Platform Stats ==========
-@app.post("/platform-stats/")
-def create_platform_stats(stats: schemas.PlatformStatsCreate):
-    return crud.create_platform_stats(stats)
+# @app.post("/platform-stats/")
+# def create_platform_stats(stats: schemas.PlatformStatsCreate):
+#     return crud.create_platform_stats(stats)
 
 @app.get("/platform-stats/", response_model=schemas.PlatformStatsResponse)
 def read_platform_stats(date: str = Query(None, description="日期 YYYY-MM-DD, 不填则返回最新数据")):
@@ -36,6 +37,22 @@ def rankings_total(snapshot_date: str = Query(None, description="日期 YYYY-MM-
 # ======== 用户每日新增 XP 排行 ========
 @app.get("/daily-rank", response_model=List[schemas.UserDailyXpChange])
 def rankings_daily(snapshot_date: str = Query(None, description="日期 YYYY-MM-DD, 默认昨天"),
-                   limit: int = Query(100, le=500)):
+                   limit: int = Query(800, le=800)):
     """用户每日新增 XP 排行"""
     return crud.get_top_daily_xp_changes(snapshot_date, limit)
+
+@app.get("/new-wallets-info")
+def get_new_wallets_api(
+    snapshot_date: str = Query(None, description="快照日期 YYYY-MM-DD, 默认昨天"),
+    offset: int = Query(0, ge=0, description="分页偏移量"),
+    limit: int = Query(100, le=500, description="每页数量")
+) -> dict:
+    if snapshot_date:
+        snapshot_date_obj = datetime.strptime(snapshot_date, "%Y-%m-%d").date()
+    else:
+        snapshot_date_obj = None
+
+    data = crud.get_new_wallets(snapshot_date_obj, offset=offset, limit=limit)
+    if data["total"] == 0:
+        raise HTTPException(status_code=404, detail="No new wallets found")
+    return data

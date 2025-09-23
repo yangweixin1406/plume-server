@@ -136,9 +136,76 @@ def get_top_daily_xp_changes(snapshot_date: date = None, limit: int = 100, debug
                 {
                     "wallet_address": r["wallet_address"],
                     "xp_change": int(r["xp_change"] or 0),
-                    "rank": idx + 1
+                    "rank": idx
                 }
                 for idx, r in enumerate(rows, start=1)
             ]
+    finally:
+        conn.close()
+
+def get_new_wallets(snapshot_date: date = None, offset: int = 0, limit: int = 100):
+    """
+    获取每日新增钱包数据（分页 + 总数） - MySQL 5.7 兼容
+    """
+    if snapshot_date is None:
+        snapshot_date = date.today() - timedelta(days=1)
+
+    yesterday = snapshot_date - timedelta(days=1)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT t.wallet_address, t.total_xp, t.xp_rank, t.snapshot_date, counts.total_count
+                FROM (
+                    SELECT u.wallet_address,
+                           us.total_xp,
+                           us.xp_rank,
+                           us.snapshot_date,
+                           1 AS is_new
+                    FROM user_snapshots us
+                    JOIN users u ON u.id = us.user_id
+                    LEFT JOIN user_snapshots us_prev
+                           ON us_prev.user_id = us.user_id
+                          AND us_prev.snapshot_date = %s
+                    WHERE us.snapshot_date = %s
+                      AND us.xp_rank IS NOT NULL
+                      AND us.total_xp > 0
+                      AND us_prev.user_id IS NULL
+                ) t
+                JOIN (
+                    SELECT COUNT(*) AS total_count
+                    FROM user_snapshots us
+                    LEFT JOIN user_snapshots us_prev
+                           ON us_prev.user_id = us.user_id
+                          AND us_prev.snapshot_date = %s
+                    WHERE us.snapshot_date = %s
+                      AND us.xp_rank IS NOT NULL
+                      AND us.total_xp > 0
+                      AND us_prev.user_id IS NULL
+                ) counts
+                ORDER BY t.total_xp DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, (yesterday, snapshot_date, yesterday, snapshot_date, limit, offset))
+            rows = cursor.fetchall()
+
+            if not rows:
+                return {"total": 0, "items": []}
+
+            total = rows[0]["total_count"]
+
+            items = [
+                {
+                    "wallet_address": r["wallet_address"],
+                    "total_xp": int(r["total_xp"] or 0),
+                    "xp_rank": r["xp_rank"],
+                    "snapshot_date": r["snapshot_date"]
+                }
+                for r in rows
+            ]
+
+            return {"total": total, "items": items}
+
     finally:
         conn.close()

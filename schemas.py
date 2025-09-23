@@ -52,3 +52,9 @@ class UserDailyXpChange(BaseModel):
     xp_change: int
     rank: int
 
+class NewWalletSnapshot(BaseModel):
+    wallet_address: str
+    snapshot_date: date | None = None
+    user_self_xp: int
+    total_xp: int
+    xp_rank: Optional[int]
