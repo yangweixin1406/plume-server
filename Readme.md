@@ -14,7 +14,7 @@ python fetch_data.py
 python insert_data.py
 
 ### 启动方法服务
-unicorn main:app --reload
+uvicorn main:app --reload
 
 ### 已经实现的接口
 1. /platform-stats 平台每日数据汇总

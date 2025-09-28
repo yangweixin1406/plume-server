@@ -37,7 +37,7 @@ def rankings_total(snapshot_date: str = Query(None, description="日期 YYYY-MM-
 # ======== 用户每日新增 XP 排行 ========
 @app.get("/daily-rank", response_model=List[schemas.UserDailyXpChange])
 def rankings_daily(snapshot_date: str = Query(None, description="日期 YYYY-MM-DD, 默认昨天"),
-                   limit: int = Query(800, le=800)):
+                   limit: int = Query(5000, le=5000)):
     """用户每日新增 XP 排行"""
     return crud.get_top_daily_xp_changes(snapshot_date, limit)
 

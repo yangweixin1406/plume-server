@@ -77,16 +77,37 @@ def get_connection():
             time.sleep(1)
     raise ConnectionError("❌ 数据库连接失败，请检查配置")
 
+def clean_tvl(value, max_value=1e12):
+    """清理 tvl 数值，保证插入数据库不会溢出"""
+    try:
+        val = float(value)
+    except (ValueError, TypeError):
+        return 0
+    if val < 0:
+        return 0
+    if val > max_value:  # 避免超出数据库范围
+        return max_value
+    return val
 
 def snapshot_values(user_id, snapshot_date, data):
+    tvl_total_usd = data.get("tvlTotalUsd", 0)
+    if tvl_total_usd is None:
+        tvl_total_usd = 0
+    else:
+        try:
+            tvl_total_usd = float(tvl_total_usd)
+        except (ValueError, TypeError):
+            tvl_total_usd = 0
+    if tvl_total_usd < 0:
+        tvl_total_usd = 0
     return (
         user_id,
         snapshot_date,
         data.get("bridgedTotal", 0),
         data.get("swapVolume", 0),
         data.get("swapCount", 0),
-        data.get("tvlTotalUsd", 0),
-        data.get("realTvlUsd", 0),
+        clean_tvl(data.get("tvlTotalUsd", 0)),     # ✅ 已清洗
+        clean_tvl(data.get("realTvlUsd", 0)),      # ✅ 建议 real_tvl_usd 也清洗
         data.get("protocolsUsed", 0),
         data.get("longestSwapStreakWeeks", 0),
         data.get("adjustmentPoints", 0),
@@ -158,6 +179,10 @@ def process_batch(batch, attempt=1):
             y_xp, y_tvl = yesterday_map.get(user_id, (0, 0))
             xp_change = int(data.get("totalXp", 0)) - int(y_xp)
             tvl_change = float(data.get("tvlTotalUsd", 0)) - float(y_tvl)
+            
+            # ✅ 清理 tvl_change，避免溢出
+            tvl_change = clean_tvl(tvl_change)
+
             if xp_change or tvl_change:
                 changes_batch.append(daily_change_values(user_id, snapshot_date, xp_change, tvl_change))
 
@@ -210,7 +235,6 @@ def update_platform_stats(snapshot_date):
         cursor.execute("""
             SELECT 
                 COUNT(*) AS total_wallets,
-                SUM(tvl_total_usd) AS total_tvl,
                 SUM(total_xp) AS total_xp
             FROM user_snapshots
             WHERE snapshot_date=%s
@@ -222,36 +246,33 @@ def update_platform_stats(snapshot_date):
             print(f"⚠️ {snapshot_date} 没有符合条件的快照数据，统计跳过")
             return
 
-        total_wallets, total_tvl, total_xp = row
+        total_wallets, total_xp = row
 
         yesterday = snapshot_date - timedelta(days=1)
         cursor.execute("""
-            SELECT total_wallets, total_tvl, total_xp
+            SELECT total_wallets, total_xp
             FROM platform_stats
             WHERE snapshot_date=%s
         """, (yesterday,))
         prev = cursor.fetchone()
         if prev:
-            prev_wallets, prev_tvl, prev_xp = prev
+            prev_wallets, prev_xp = prev
         else:
-            prev_wallets, prev_tvl, prev_xp = 0, 0, 0
+            prev_wallets, prev_xp = 0, 0
 
         new_wallets = total_wallets - prev_wallets
-        new_tvl = float(total_tvl) - float(prev_tvl)
         new_xp = int(total_xp) - int(prev_xp)
 
         cursor.execute("""
             INSERT INTO platform_stats
-                (snapshot_date, total_wallets, total_tvl, total_xp, new_wallets, new_tvl, new_xp)
-            VALUES (%s,%s,%s,%s,%s,%s,%s)
+                (snapshot_date, total_wallets, total_xp, new_wallets, new_xp)
+            VALUES (%s,%s,%s,%s,%s)
             ON DUPLICATE KEY UPDATE
                 total_wallets=VALUES(total_wallets),
-                total_tvl=VALUES(total_tvl),
                 total_xp=VALUES(total_xp),
                 new_wallets=VALUES(new_wallets),
-                new_tvl=VALUES(new_tvl),
                 new_xp=VALUES(new_xp)
-        """, (snapshot_date, total_wallets, total_tvl, total_xp, new_wallets, new_tvl, new_xp))
+        """, (snapshot_date, total_wallets, total_xp, new_wallets, new_xp))
 
         conn.commit()
         print(f"✅ {snapshot_date} 平台统计已更新 | 总钱包={total_wallets}, 新增钱包={new_wallets}")
@@ -265,7 +286,7 @@ def update_platform_stats(snapshot_date):
 
 # ================= 主程序入口 =================
 if __name__ == "__main__":
-    json_file = "20250923_leaderboard.json"  # 文件名表示当天快照
+    json_file = "20250928_leaderboard.json"  # 文件名表示当天快照
 
     base_name = os.path.basename(json_file).split("_")[0]  # 20250903
     record_date = datetime.strptime(base_name, "%Y%m%d").date()

@@ -89,11 +89,9 @@ CREATE TABLE IF NOT EXISTS platform_stats (
     snapshot_date DATE NOT NULL,
 
     total_wallets BIGINT DEFAULT 0,
-    total_tvl DECIMAL(30,10) DEFAULT 0,
     total_xp BIGINT DEFAULT 0,
 
     new_wallets BIGINT DEFAULT 0,
-    new_tvl DECIMAL(30,10) DEFAULT 0,
     new_xp BIGINT DEFAULT 0,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
