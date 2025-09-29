@@ -286,7 +286,7 @@ def update_platform_stats(snapshot_date):
 
 # ================= 主程序入口 =================
 if __name__ == "__main__":
-    json_file = "20250928_leaderboard.json"  # 文件名表示当天快照
+    json_file = "20250929_leaderboard.json"  # 文件名表示当天快照
 
     base_name = os.path.basename(json_file).split("_")[0]  # 20250903
     record_date = datetime.strptime(base_name, "%Y%m%d").date()

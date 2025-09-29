@@ -2,8 +2,18 @@ from fastapi import FastAPI, HTTPException, Query
 import crud, schemas
 from typing import List, Dict, Any
 from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Demo API")
+
+# 允许跨域
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 或者指定 ["http://localhost:1890"] 更安全
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ========== Platform Stats ==========
 # @app.post("/platform-stats/")
@@ -37,7 +47,7 @@ def rankings_total(snapshot_date: str = Query(None, description="日期 YYYY-MM-
 # ======== 用户每日新增 XP 排行 ========
 @app.get("/daily-rank", response_model=List[schemas.UserDailyXpChange])
 def rankings_daily(snapshot_date: str = Query(None, description="日期 YYYY-MM-DD, 默认昨天"),
-                   limit: int = Query(5000, le=5000)):
+                   limit: int = Query(100, le=5000)):
     """用户每日新增 XP 排行"""
     return crud.get_top_daily_xp_changes(snapshot_date, limit)
 

@@ -38,7 +38,7 @@ def count_wallets_by_xp(file_path: str):
     return counter
 
 if __name__ == "__main__":
-    result = count_wallets_by_xp("20250928_leaderboard.json")
+    result = count_wallets_by_xp("20250929_leaderboard.json")
     print("📊 XP 分布统计（过滤 totalXp=0, xpRank!=null）：")
     for _, _, label in ranges:
         print(f"{label}: {result.get(label, 0)}")
